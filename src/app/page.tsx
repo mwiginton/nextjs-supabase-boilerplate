@@ -1,95 +1,161 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client'
+
+import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabaseClient'
+import styles from './page.module.css'
+import Image from 'next/image'
 
 export default function Home() {
+  const [user, setUser] = useState<any>(null)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [authError, setAuthError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn')
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data } = await supabase.auth.getUser()
+      setUser(data.user)
+    }
+    getUser()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const signInWithGoogle = async () => {
+    await supabase.auth.signInWithOAuth({ provider: 'google' })
+  }
+
+  const signOut = async () => {
+    await supabase.auth.signOut()
+    setUser(null)
+  }
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setAuthError('')
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      setAuthError(error.message)
+    }
+    setLoading(false)
+  }
+
+  const handleEmailSignUp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setAuthError('')
+    const { error } = await supabase.auth.signUp({ email, password })
+    if (error) {
+      setAuthError(error.message)
+    }
+    setLoading(false)
+  }
+
   return (
     <div className={styles.page}>
       <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>src/app/page.tsx</code>.
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+        <div className={styles.card}>
+          <Image src="/logo.svg" alt="Logo" width={64} height={64} className={styles.logo} />
+          <h1 className={styles.title}>
+            {user
+              ? `Welcome, ${user.email}`
+              : mode === 'signIn'
+              ? 'Sign in to your account'
+              : 'Create an account'}
+          </h1>
 
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
+          {user ? (
+            <button className={styles.signOutButton} onClick={signOut}>
+              Sign Out
+            </button>
+          ) : (
+            <>
+              <form
+                onSubmit={mode === 'signIn' ? handleEmailLogin : handleEmailSignUp}
+                className={styles.form}
+              >
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+                <input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+                <button type="submit" disabled={loading}>
+                  {loading
+                    ? mode === 'signIn'
+                      ? 'Signing in...'
+                      : 'Creating account...'
+                    : mode === 'signIn'
+                    ? 'Sign in with Email'
+                    : 'Sign up with Email'}
+                </button>
+              </form>
+
+              <p style={{ fontSize: '14px', textAlign: 'center', color: '#555' }}>
+                {mode === 'signIn' ? (
+                  <>
+                    Don't have an account?{' '}
+                    <button
+                      type="button"
+                      onClick={() => setMode('signUp')}
+                      style={{
+                        color: '#0070f3',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontWeight: 500,
+                      }}
+                    >
+                      Sign up
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    Already have an account?{' '}
+                    <button
+                      type="button"
+                      onClick={() => setMode('signIn')}
+                      style={{
+                        color: '#0070f3',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontWeight: 500,
+                      }}
+                    >
+                      Sign in
+                    </button>
+                  </>
+                )}
+              </p>
+
+              <div className={styles.divider}>or</div>
+
+              <button className={styles.googleButton} onClick={signInWithGoogle}>
+                <Image src="/google-icon.svg" alt="Google" width={20} height={20} />
+                Continue with Google
+              </button>
+
+              {authError && <p className={styles.error}>{authError}</p>}
+            </>
+          )}
         </div>
       </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
-  );
+  )
 }
