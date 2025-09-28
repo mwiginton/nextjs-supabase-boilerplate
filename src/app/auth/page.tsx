@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import styles from './auth.module.css'
+import styles from './page.module.css'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 
-export default function Home() {
+export default function AuthPage() {
   const [user, setUser] = useState<any>(null)
   const [loadingUser, setLoadingUser] = useState(true)
   const [email, setEmail] = useState('')
@@ -14,6 +14,7 @@ export default function Home() {
   const [authError, setAuthError] = useState('')
   const [loading, setLoading] = useState(false)
   const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn')
+  const [confirmationSent, setConfirmationSent] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -21,7 +22,7 @@ export default function Home() {
       const { data } = await supabase.auth.getUser()
       if (data.user) {
         setUser(data.user)
-        router.push('/dashboard')
+        router.replace('/dashboard')
       } else {
         setLoadingUser(false)
       }
@@ -35,7 +36,7 @@ export default function Home() {
       const currentUser = session?.user ?? null
       setUser(currentUser)
       if (currentUser) {
-        router.push('/dashboard')
+        router.replace('/dashboard')
       } else {
         setLoadingUser(false)
       }
@@ -67,7 +68,7 @@ export default function Home() {
     if (error) {
       setAuthError(error.message)
     } else {
-      router.push('/dashboard')
+      router.replace('/dashboard')
     }
     setLoading(false)
   }
@@ -76,12 +77,23 @@ export default function Home() {
     e.preventDefault()
     setLoading(true)
     setAuthError('')
-    const { error } = await supabase.auth.signUp({ email, password })
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/`,
+      },
+    })
+
     if (error) {
       setAuthError(error.message)
+    } else if (!data.session) {
+      setConfirmationSent(true)
     } else {
-      router.push('/dashboard')
+      router.replace('/dashboard')
     }
+
     setLoading(false)
   }
 
@@ -93,6 +105,40 @@ export default function Home() {
             <Image src="/logo.svg" alt="Logo" width={64} height={64} className={styles.logo} />
             <h1 className={styles.title}>Loading your session...</h1>
             <div className={styles.spinner}></div>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  if (confirmationSent) {
+    return (
+      <div className={styles.page}>
+        <main className={styles.main}>
+          <div className={styles.card}>
+            <Image src="/logo.svg" alt="Logo" width={64} height={64} className={styles.logo} />
+            <h1 className={styles.title}>Check your email</h1>
+            <p style={{ textAlign: 'center', marginTop: '1rem', color: '#444' }}>
+              A confirmation link has been sent to <strong>{email}</strong>.<br />
+              Click the link in your inbox to verify your account before signing in.
+            </p>
+            <button
+              onClick={() => {
+                setConfirmationSent(false)
+                setMode('signIn')
+              }}
+              style={{
+                marginTop: '1.5rem',
+                backgroundColor: '#0070f3',
+                color: '#fff',
+                padding: '0.75rem 1rem',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+              }}
+            >
+              Back to Sign In
+            </button>
           </div>
         </main>
       </div>
@@ -185,7 +231,9 @@ export default function Home() {
                 )}
               </p>
 
-              <div className={styles.divider}>or</div>
+              <div className={styles.divider}>
+                <span>or</span>
+              </div>
 
               <button className={styles.googleButton} onClick={signInWithGoogle}>
                 <Image src="/google-icon.svg" alt="Google" width={20} height={20} />
